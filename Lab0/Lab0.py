@@ -23,12 +23,12 @@ IMAGE_SIZE = 784
 
 # Use these to set the algorithm to use.
 #ALGORITHM = "guesser"
-#ALGORITHM = "custom_net"
-ALGORITHM = "tf_net"
+ALGORITHM = "custom_net"
+#ALGORITHM = "tf_net"
 
 
 class NeuralNetwork_2Layer():
-    def __init__(self, inputSize, outputSize, neuronsPerLayer, learningRate = 0.1):
+    def __init__(self, inputSize, outputSize, neuronsPerLayer, learningRate = 0.01):
         self.inputSize = inputSize
         self.outputSize = outputSize
         self.neuronsPerLayer = neuronsPerLayer
@@ -44,7 +44,7 @@ class NeuralNetwork_2Layer():
 
     # Activation prime function.
     def __sigmoidDerivative(self, x):
-        return np.exp(-x) / ((1 + np.exp(-x)) ** 2)
+        return x * (1 - x)
 
     # Batch generator for mini-batches. Not randomized.
     def __batchGenerator(self, l, n):
@@ -52,28 +52,33 @@ class NeuralNetwork_2Layer():
             yield l[i : i + n]
 
     # Training with backpropagation.
-    def train(self, xVals, yVals, epochs = 100, minibatches = True, mbs = 100):
-        x_val = self.__batchGenerator(xVals, mbs)
-        y_val = self.__batchGenerator(yVals, mbs)
+    def train(self, xVals, yVals, epochs = 150, minibatches = True, mbs = 100):
 
         for it in range(epochs):
-            x = next(x_val)
-            y = next(y_val)
-            feed_forward_results = self.__forward(x)
+            x_val = self.__batchGenerator(xVals, mbs)
+            y_val = self.__batchGenerator(yVals, mbs)
+            for i in range(600):
+                x = next(x_val)
+                y = next(y_val)
+                feed_forward_results = self.__forward(x)
 
-            #layer 2
-            layer2error = y - feed_forward_results[1]
-            layer2delta = layer2error * self.__sigmoidDerivative(feed_forward_results[1])
-            transpose_m = np.transpose(feed_forward_results[0])
-            layer2adjustment = np.dot(transpose_m, layer2delta) * self.lr
+                #layer 2
+                #print("Y is %s" % y)
+                #print(feed_forward_results[1])
+                layer2error = y - feed_forward_results[1]
+                layer2delta = layer2error * self.__sigmoidDerivative(feed_forward_results[1])
+                transpose_m = np.transpose(feed_forward_results[0])
+                layer2adjustment = np.dot(transpose_m, layer2delta) * self.lr
 
-            #layer1
-            layer1error = np.dot(layer2delta, np.transpose(self.W2))
-            layer1delta = layer1error * self.__sigmoidDerivative(feed_forward_results[0])
-            layer1adjustment = np.dot(np.transpose(x), layer1delta) * self.lr
+                #layer1
+                layer1error = np.dot(layer2delta, np.transpose(self.W2))
+                layer1delta = layer1error * self.__sigmoidDerivative(feed_forward_results[0])
+                layer1adjustment = np.dot(np.transpose(x), layer1delta) * self.lr
 
-        self.W1 += layer1adjustment
-        self.W2 += layer2adjustment
+                self.W1 += layer1adjustment
+                self.W2 += layer2adjustment
+
+            #print(np.mean(np.abs(layer2error)))
 
     # Forward pass.
     def __forward(self, input):
@@ -115,9 +120,12 @@ def getRawData():
 def preprocessData(raw):
     ((xTrain, yTrain), (xTest, yTest)) = raw
     xTrain = xTrain / 255.0
-    yTrain = yTrain / 255.0
+    xTest = xTest / 255.0
+
     yTrainP = to_categorical(yTrain, NUM_CLASSES)
     yTestP = to_categorical(yTest, NUM_CLASSES)
+
+
     xTrain = xTrain.reshape([60000, 784])
     xTest = xTest.reshape([10000, 784])
     print("New shape of xTrain dataset: %s." % str(xTrain.shape))
@@ -129,8 +137,7 @@ def preprocessData(raw):
 
 
 def tf_model():
-    mnist = tf.keras.datasets.mnist
-    (xTrain, yTrain), (xTest, yTest) = mnist.load_data()
+    (xTrain, yTrain), (xTest, yTest) = getRawData()
 
     xTrain = tf.keras.utils.normalize(xTrain, axis=1)
     xTrain = xTrain.reshape(xTrain.shape[0], -1)
@@ -216,8 +223,7 @@ def evalResults(data, preds):
         preds[i] = [0 for x in preds[i]]
         preds[i][index] = 1
 
-    #problem - the max index is always 0 in preds[i], therefore the accuracy is 9,8 all the time, which
-    # couldn't understand the reason after training with backpropagation
+    #print(preds)
 
     for i in range(preds.shape[0]):
         #print(preds[i])
